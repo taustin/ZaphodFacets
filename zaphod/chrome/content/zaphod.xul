@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<overlay id="zaphod" 
+         xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+  <script type="application/x-javascript" src="chrome://zaphod/content/configuration.js" />
+  <script type="application/x-javascript" src="chrome://zaphod/content/addon.js" />
+  <statusbar id="status-bar">
+    <statusbarpanel id="narc-panel">
+      <image id="narcissus-logo" src="chrome://zaphod/content/mozilla_deactivated.ico" onclick="Zaphod.toggleJSEngine()" />
+    </statusbarpanel>
+ </statusbar>
+</overlay>
+

@@ -1,0 +1,1 @@
+This project is based on Zaphod (http://mozillalabs.com/zaphod/).  It is modified in order to support information flow analysis using faceted values, a mechanism we are researching that is related to secure multi-execution.  The essential idea is that we track both public and private views for sensitive data.
