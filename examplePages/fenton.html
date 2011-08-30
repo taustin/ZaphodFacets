@@ -1,0 +1,60 @@
+<html>
+<head>
+  <title>Fenton code example</title>
+  <meta http-equiv="Content-Script-Type" content="application/narcissus" />
+  <script type="application/narcissus">
+  function main() {
+    var p = 'h';
+    secret = f(cloak(false,'h'));
+    alert("f(x)=" + getView(secret));
+
+    secret = f(cloak(true,'h'));
+    alert("f(x)=" + getView(secret));
+  }
+
+  // The classic info flow code snippet
+  function f(x) {
+    var y = true;
+    var z = true;
+    if (x) {
+      y = false;
+    }
+    if (y) {
+      z = false;
+    }
+    return z;
+  }
+  </script>
+</head>
+<body>
+  <h1>Fenton example</h1>
+  <p>
+  This page demonstrates the classic code snippet that predominates in information flow analysis:
+  </p>
+  <pre>
+  function f(x) {
+    var y = true;
+    var z = true;
+    if (x) {
+      y = false;
+    }
+    if (y) {
+      z = false;
+    }
+    return z;
+  }
+  </pre>
+  <p>
+  Click on the 'Run Example' button, and the same function will be run twice with 2 different
+  cloaked values.  One is <strong>cloak(true)</strong>.  The other is <strong>cloak(false)</strong>.
+  The public result of both executions will be displayed in alert dialog boxes.
+  </p>
+  <p>
+  <strong>Be sure that the modified version of Zaphod is installed and active.</strong>
+  You should see a small, red mozilla logo at the bottom right of your browser.
+  </p>
+  <form method="POST" action="">
+  <input type="button" value="Run Example" onclick="main();" />
+  </form>
+</body>
+</html>
