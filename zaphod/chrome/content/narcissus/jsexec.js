@@ -62,6 +62,15 @@ Narcissus.interpreter = (function() {
     var hostGlobal = Narcissus.hostGlobal;
     var desugaring = Narcissus.desugaring;
 
+    // Faceted Value utilities
+    var FacetedValue = Zaphod.facets.FacetedValue;
+    var ProgramCounter = Zaphod.facets.ProgramCounter;
+    var buildVal = Zaphod.facets.buildVal;
+    var evaluateEach = Zaphod.facets.evaluateEach;
+    var evaluateEachPair = Zaphod.facets.evaluateEachPair;
+    var strip = Zaphod.facets.strip;
+    var rebuild = Zaphod.facets.rebuild;
+
     // Set constants in the local scope.
     eval(definitions.consts);
 
@@ -102,6 +111,11 @@ Narcissus.interpreter = (function() {
         return re.test(e.toString());
     }
 
+    function getPC() {
+        var x = ExecutionContext.current;
+        return x ? x.pc : new ProgramCounter();;
+    }
+
     // The underlying global object for narcissus.
     var globalBase = {
         // Value properties.
@@ -128,6 +142,16 @@ Narcissus.interpreter = (function() {
             x2.execute(ast);
             return x2.result;
         },
+
+        /*
+        alert: function(msg){
+            alert('pc(' + getPC() + '):' + msg);
+        },
+
+        print: function(msg){
+            print('pc(' + getPC() + '):' + msg);
+        },
+        */
 
         // Class constructors.  Where ECMA-262 requires C.length === 1, we declare
         // a dummy formal parameter.
@@ -186,25 +210,12 @@ Narcissus.interpreter = (function() {
         assertEq: function() {
             return assertEq.apply(null, arguments);
         },
-        cloak: function(v, principal) {
-            if (principal === null)
-                throw new Error('Principal cannot be null');
-            return new FacetedValue(new Label(principal), v, undefined);
-        },
+        cloak: Zaphod.facets.cloak,
         // A view is represented as a program counter,
         // except that all labels can only be 'positive'.
         // If a label is not explicitly in the view,
         // the viewer sees the unauthorized view.
-        getView: function getView(v, view) {
-            view = view || EMPTY_PC;
-            if (v instanceof FacetedValue) {
-                if (view.contains(v.label))
-                    return getView(v.authorized, view);
-                else
-                    return getView(v.unauthorized, view);
-            }
-            else return v;
-        }
+        getView: Zaphod.facets.getView,
     };
 
     // Load missing functions onto Array and String
@@ -214,7 +225,8 @@ Narcissus.interpreter = (function() {
             definitions.defineProperty(globalBase.Array, fName, Array[fName], false,
                 false, true);
         });
-    ["charAt", "charCodeAt", "concat", "fromCharCode", "indexOf",
+    //["charAt", "charCodeAt", "concat", "fromCharCode", "indexOf",
+    ["concat", "indexOf",
         "lastIndexOf", "localeCompare", "match", "replace", "search", "slice",
         "split", "substring", "toLowerCase", "toUpperCase", "trim", "valueOf",
         //HTML methods
@@ -223,6 +235,14 @@ Narcissus.interpreter = (function() {
             definitions.defineProperty(globalBase.String, fName, String[fName], false,
                 false, true);
         });
+    var oldFCC = String.fromCharCode;
+    globalBase.String.fromCharCode = function(v1,v2) {
+        x = ExecutionContext.current;
+        return evaluateEachPair(v1, v2, function(v1,v2,x) {
+                if (v2) return oldFCC(v1,v2);
+                else return oldFCC(v1);
+        }, x);
+    };
 
     // Operators
     var ops = {};
@@ -251,255 +271,6 @@ Narcissus.interpreter = (function() {
     ops[UNARY_PLUS] = '+';
     ops[UNARY_MINUS] = '-';
 
-    function FacetedValue(label, auth, unauth) {
-        this.label = label;
-        this.authorized = auth;
-        this.unauthorized = unauth;
-    }
-    FacetedValue.prototype.toString = function() {
-        return '<' + this.label + '?' + this.authorized + ':' + this.unauthorized + '>';
-    }
-
-    function head(v) {
-        if (v instanceof FacetedValue) {
-            return v.label.unsigned();
-        }
-        if (v instanceof ProgramCounter && v.first()) {
-            return v.first().unsigned();
-        }
-        else return MAX_LABEL;
-    }
-
-    function buildVal(pc, vn, vo) {
-        var va = vn ? vn.authorized : vn,
-            vb = vn ? vn.unauthorized : vn,
-            vc = vo ? vo.authorized : vo,
-            vd = vo ? vo.unauthorized : vo,
-            rest = pc.rest();
-        if (pc.isEmpty()) return vn;
-        else if (head(pc) === head(vn) && head(vn) === head(vo)) {
-            let k = vn.label;
-            if (!pc.first().bar)
-                return new FacetedValue(k, buildVal(rest,va,vc), vd);
-            else
-                return new FacetedValue(k, vc, buildVal(rest,vb,vd));
-        }
-        else if (head(vn) === head(vo) && head(vn) < head(pc)) {
-            let k = vn.label;
-            return new FacetedValue(k, buildVal(pc,va,vc), buildVal(pc,vb,vd));
-        }
-        else if (head(pc) === head(vn) && head(vn) < head(vo)) {
-            let k = vn.label;
-            if (!pc.first().bar)
-                return new FacetedValue(k, buildVal(rest,va,vo), vo);
-            else
-                return new FacetedValue(k, vo, buildVal(rest,vb,vo));
-        }
-        else if (head(pc) === head(vo) && head(vo) < head(vn)) {
-            let k = vo.label;
-            if (!pc.first().bar)
-                return new FacetedValue(k, buildVal(rest,vn,vc), vd);
-            else
-                return new FacetedValue(k, vc, buildVal(rest,vn,vd));
-        }
-        else if (head(pc) < head(vn) && head(pc) < head(vo)) {
-            let firstLab = pc.first();
-            let k = firstLab.bar ? firstLab.reverse() : firstLab;
-            if (!firstLab.bar)
-                return new FacetedValue(k, buildVal(rest,vn,vo), vo);
-            else
-                return new FacetedValue(k, vo, buildVal(rest,vn,vo));
-        }
-        else if (head(vn) < head(pc) && head(vn) < head(vo)) {
-            let k = vn.label;
-            return new FacetedValue(k, buildVal(pc,va,vo), buildVal(pc,vb,vo));
-        }
-        else if (head(vo) < head(pc) && head(vo) < head(vn)) {
-            let k = vo.label;
-            return new FacetedValue(k, buildVal(pc,vn,vc), buildVal(pc,vn,vd));
-        }
-        else {
-            throw new Error('Unhandled case for buildVal');
-        }
-    }
-
-    function Label(s, bar) {
-        this.value = bar ? s.toUpperCase() : s.toLowerCase();
-        this.bar = bar;
-    }
-    Label.prototype.reverse = function() {
-        return new Label(this.value, !this.bar);
-    }
-    Label.prototype.unsigned = function() {
-        return this.value.toLowerCase();
-    }
-    Label.prototype.toString = function() {
-        return this.value;
-    }
-
-    // FIXME: this is such a hack
-    const MAX_LABEL= 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
-
-    // Sorts alphabetically, but ignores case
-    function compareLabels(a, b) {
-        var al = a.unsigned();
-            bl = b.unsigned();
-        if (al === bl) return 0;
-        else if (al === MAX_LABEL) return 1;
-        else if (bl === MAX_LABEL) return -1;
-        else if (al < bl) return -1;
-        else return 1;
-    }
-
-    function ProgramCounter(initialLabel) {
-        this.labelSet = [];
-        if (initialLabel && !(initialLabel instanceof Label))
-            throw new Error('Not a label');
-        if (initialLabel) this.labelSet.push(initialLabel);
-    }
-    ProgramCounter.prototype.contains = function(label) {
-        for (var i in this.labelSet) {
-            let l = this.labelSet[i];
-            if (l.value === label.value) return true;
-        }
-        return false;
-    }
-    ProgramCounter.prototype.join = function(label) {
-        if (this.contains(label)) return this;
-        var newPC = new ProgramCounter();
-        newPC.labelSet = this.labelSet.slice(0);
-        newPC.labelSet.push(label);
-        newPC.labelSet.sort(compareLabels);
-        return newPC;
-    }
-    ProgramCounter.prototype.first = function() {
-        if (this.labelSet.length < 1) return null;
-        else return this.labelSet[0];
-    }
-    ProgramCounter.prototype.rest = function() {
-        if (this.labelSet.length < 1) return EMPTY_PC;
-        else {
-            var newPC = new ProgramCounter();
-            newPC.labelSet = this.labelSet.slice(1);
-            return newPC;
-        }
-    }
-    ProgramCounter.prototype.isEmpty = function() {
-        return this.labelSet.length < 1;
-    }
-    ProgramCounter.prototype.toString = function() {
-        return '{' + this.labelSet + '}';
-    }
-
-    const EMPTY_PC = new ProgramCounter();
-
-    function evaluateEach(v, f, x) {
-        let pc = x.pc;
-        if (!(v instanceof FacetedValue)) {
-            return f(v, x);
-        }
-
-        if (pc.contains(v.label)) {
-            return evaluateEach(v.authorized, f, x);
-        }
-        else if (pc.contains(v.label.reverse())) {
-            return evaluateEach(v.unauthorized, f, x);
-        }
-        else {
-            let va, vu;
-            try {
-                x.pc = pc.join(v.label);
-                va = evaluateEach(v.authorized, f, x);
-                x.pc = pc.join(v.label.reverse());
-                vu = evaluateEach(v.unauthorized, f, x);
-                x.pc = pc;
-            }
-            catch (e) {
-                // Terminate program to avoid leaking data through exceptions
-                throw END_SIGNAL;
-            }
-            return new FacetedValue(v.label, va, vu);
-        }
-    }
-
-    function evaluateEachPair(v1, v2, f, x) {
-        let pc = x.pc;
-        if (!(v1 instanceof FacetedValue || v2 instanceof FacetedValue)) {
-            return f(v1, v2, x);
-        }
-
-        let k = head(v1) < head(v2) ? v1.label : v2.label;
-
-        if (pc.contains(k)) {
-            if (head(v1) === head(v2)) {
-                return evaluateEachPair(v1.authorized, v2.authorized, f, x);
-            }
-            else if (v1 && v1.label === k) {
-                return evaluateEachPair(v1.authorized, v2, f, x);
-            }
-            else {
-                return evaluateEachPair(v1, v2.authorized, f, x);
-            }
-        }
-        else if (pc.contains(k.reverse())) {
-            if (head(v1) === head(v2)) {
-                return evaluateEachPair(v1.unauthorized, v2.unauthorized, f, x);
-            }
-            else if (v1 && v1.label === k) {
-                return evaluateEachPair(v1.unauthorized, v2, f, x);
-            }
-            else {
-                return evaluateEachPair(v1, v2.unauthorized, f, x);
-            }
-        }
-        else {
-            if (head(v1) === head(v2)) {
-                try {
-                    x.pc = pc.join(k);
-                    let va = evaluateEachPair(v1.authorized, v2.authorized, f, x);
-                    x.pc = pc.join(k.reverse());
-                    let vu = evaluateEachPair(v1.unauthorized, v2.unauthorized, f, x);
-                    x.pc = pc;
-                }
-                catch (e) {
-                    // Terminate program to avoid leaking data through exceptions
-                    throw END_SIGNAL;
-                }
-                return new FacetedValue(k, va, vu);
-            }
-            else if (v1 && v1.label === k) {
-                let va, vu;
-                try {
-                    x.pc = pc.join(k);
-                    va = evaluateEachPair(v1.authorized, v2, f, x);
-                    x.pc = pc.join(k.reverse());
-                    vu = evaluateEachPair(v1.unauthorized, v2, f, x);
-                    x.pc = pc;
-                }
-                catch (e) {
-                    // Terminate program to avoid leaking data through exceptions
-                    throw END_SIGNAL;
-                }
-                return new FacetedValue(k, va, vu);
-            }
-            else {
-                let va, vu;
-                try {
-                    x.pc = pc.join(k);
-                    va = evaluateEachPair(v1, v2.authorized, f, x);
-                    x.pc = pc.join(k.reverse());
-                    vu = evaluateEachPair(v1, v2.unauthorized, f, x);
-                    x.pc = pc;
-                }
-                catch (e) {
-                    // Terminate program to avoid leaking data through exceptions
-                    throw END_SIGNAL;
-                }
-                return new FacetedValue(k, va, vu);
-            }
-        }
-        throw new Error('Unhandlied case of evaluateEachPair');
-    }
 
     function evalUnaryOp(c, x, op) {
         var v = getValue(execute(c[0], x), x.pc);
@@ -607,7 +378,7 @@ Narcissus.interpreter = (function() {
     gSp.toSource = function () { return this.value.toSource(); };
     gSp.toString = function () { return this.value; };
     gSp.valueOf  = function () { return this.value; };
-    global.String.fromCharCode = String.fromCharCode;
+    //global.String.fromCharCode = String.fromCharCode;
 
     ExecutionContext.current = null;
 
@@ -687,7 +458,7 @@ Narcissus.interpreter = (function() {
             //return (v.base || global)[v.propertyName] = w;
             var base = v.base || global;
             var oldVal = base[v.propertyName];
-            base[v.propertyName] = buildVal(pc, w, oldVal);
+            var newVal = base[v.propertyName] = buildVal(pc, w, oldVal);
             // The returned value should be the local version, not the stored
             // version.  Within a block, the extra labels are not needed and
             // are simply wasteful.
@@ -785,6 +556,7 @@ Narcissus.interpreter = (function() {
     }
 
     function execute(n, x) {
+        //try{
         var a, c, f, i, j, r, s, t, u, v, v1, v2;
 
         // Store the original pc
@@ -1131,8 +903,8 @@ Narcissus.interpreter = (function() {
             r = execute(c[0], x);
             t = n.assignOp;
             if (t)
-                u = getValue(r);
-            v = getValue(execute(c[1], x), pc);
+                u = getValue(r, x.pc);
+            v = getValue(execute(c[1], x), x.pc);
             if (t) {
                 v = evalBinOp(u, v, x, ops[t])
             }
@@ -1263,9 +1035,12 @@ Narcissus.interpreter = (function() {
           case DOT:
             c = n.children;
             r = execute(c[0], x);
-            v = evaluateEach(r, function(r,x) {
-                t = getValue(r, pc);
+            t = getValue(r, pc);
+            v = evaluateEach(t, function(t,x) {
                 u = c[1].value;
+                if (u==='charAt') {
+                    this.THA = true;
+                }
                 return new Reference(toObject(t, r, c[0]), u, n);
             }, x);
             break;
@@ -1296,7 +1071,8 @@ Narcissus.interpreter = (function() {
             r = execute(c[0], x);
             a = execute(c[1], x);
             f = getValue(r, pc);
-            v = evaluateEach(f, function(f,x) {
+            //v = evaluateEach(f, function(f,x) {
+            v = evaluateEachPair(f, r, function(f, r, x) {
                 x.staticEnv = n.staticEnv;
                 if (isPrimitive(f) || typeof f.__call__ !== "function") {
                     throw new TypeError(r + " is not callable", c[0].filename, c[0].lineno);
@@ -1393,6 +1169,12 @@ Narcissus.interpreter = (function() {
         }
 
         return v;
+        /*
+        } catch(e if !isSignal(e)) {
+            alert('Caught e: ' + e + ' \nn: ' + n);
+            throw END_SIGNAL;
+        }
+        */
     }
 
     function Activation(f, a) {
@@ -1621,7 +1403,8 @@ Narcissus.interpreter = (function() {
 
         call: function (t) {
             // Curse ECMA a third time!
-            var a = Array.prototype.splice.call(arguments, 1);
+            //var a = Array.prototype.splice.call(arguments, 1);
+            var a = Array.prototype.slice.call(arguments, 1);
             return this.apply(t, a);
         }
     };
@@ -1637,17 +1420,42 @@ Narcissus.interpreter = (function() {
         definitions.defineProperty(Fp, "__call__",
                                    function (t, a, x) {
                                        // Curse ECMA yet again!
-                                       a = Array.prototype.splice.call(a, 0, a.length);
-                                       return this.apply(t, a);
+                                       //FIXME: Need support for faceted arguments here
+                                       //a = Array.prototype.splice.call(a, 0, a.length);
+                                       a = Array.prototype.slice.call(a, 0, a.length);
+                                       if (!definitions.isNativeCode(this)) {
+                                           return this.apply(t, a);
+                                       }
+                                       var thisObj = this;
+                                       switch (a.length) {
+                                         case 1:
+                                            //Zaphod.log('a[0]=' + a[0] + ' pc:' + getPC());
+                                            //if (a[0]) Zaphod.log('?' + (a[0] instanceof FacetedValue) + 'auth' + a[0].authorized);
+                                            return evaluateEach(rebuild(a[0],x.pc), function(v,x) {
+                                               //Zaphod.log('**v=' + v);
+                                               return thisObj.call(t, v);
+                                            }, x);
+                                         case 2:
+                                            return evaluateEachPair(strip(a[0],x.pc), strip(a[1],x.pc),
+                                                function(v1,v2,x) {
+                                                    return thisObj.call(t, v1, v2);
+                                                }, x);
+                                         //No support for more than 2 FV
+                                         //arguments for native functions
+                                         default:
+                                            return thisObj.apply(t, a);
+                                       }
                                    }, true, true, true);
         definitions.defineProperty(REp, "__call__",
                                    function (t, a, x) {
-                                       a = Array.prototype.splice.call(a, 0, a.length);
+                                       //a = Array.prototype.splice.call(a, 0, a.length);
+                                       a = Array.prototype.slice.call(a, 0, a.length);
                                        return this.exec.apply(this, a);
                                    }, true, true, true);
         definitions.defineProperty(Fp, "__construct__",
                                    function (a, x) {
-                                       a = Array.prototype.splice.call(a, 0, a.length);
+                                       //a = Array.prototype.splice.call(a, 0, a.length);
+                                       a = Array.prototype.slice.call(a, 0, a.length);
                                        switch (a.length) {
                                          case 0:
                                            return new this();
@@ -1848,7 +1656,8 @@ Narcissus.interpreter = (function() {
         evaluate: evaluate,
         getValueHook: null,
         repl: repl,
-        test: test
+        test: test,
+        getPC: getPC
     };
 
 }());

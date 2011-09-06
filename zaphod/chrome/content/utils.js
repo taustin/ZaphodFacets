@@ -13,6 +13,7 @@
   const MUTATE_REMOVE = 4;
   const MUTATE_MOVE = 5;
   const MUTATE_INSERT = 6;
+  const NUL = '\0';
 
   var nodeMap={};
 
@@ -42,6 +43,16 @@
     parentNode.appendChild(n);
   }
 
+  // Some cheats to deal with magic properties.  Not exhaustive
+  function addMagicProperties(n, hostNode) {
+    ['style', 'value', 'innerHTML', 'src', 'offsetLeft', 'offsetTop'].forEach(function(prop) {
+      Object.defineProperty(n, prop, {
+          get: function() { return hostNode[prop]; },
+          set: function(newVal) { hostNode[prop] = newVal; }
+      });
+    });
+  }
+
   // Clones hostNode as a dom.js node (using n as the clone, if it exists)
   // and adds the clone to the parentNode.
   function cloneNode(hostNode, parentNode, n) {
@@ -50,13 +61,7 @@
       case Node.ELEMENT_NODE:
         if (!n) {
           n = document.createElement(hostNode.tagName);
-          // FIXME: Some cheats to deal with magic properties.  Not exhaustive
-          ['style', 'value', 'innerHTML', 'src', 'offsetLeft', 'offsetTop'].forEach(function(prop) {
-            Object.defineProperty(n, prop, {
-                get: function() { return hostNode[prop]; },
-                set: function(newVal) { hostNode[prop] = newVal; }
-            });
-          });
+          addMagicProperties(n, hostNode);
           addChild(parentNode, n, hostNode);
         }
         for (i=0; i<hostNode.childNodes.length; i++) {
@@ -90,29 +95,35 @@
 
   // Create a spidermonkey node from a dom.js node
   function createHostNode(domjsNodeStr, nid) {
-    var n, child, attr;
-
-    //FIXME: Should handle more complex strings
-    const NULL = '\0';
+    var n, substrArr, s, t, i, parentNode;
 
     // Check to see if the host node already exists
     if (nodeMap[nid]) return nodeMap[nid];
 
-    switch (domjsNodeStr.charAt(0)) {
-      case 'T':
-        n = hostDoc.createTextNode(domjsNodeStr.substr(1));
-        break;
-      case 'C':
-        n = hostDoc.createComment(domjsNodeStr.substr(1));
-        break;
-      case 'H':
-      case 'E':
-        n = hostDoc.createElement(domjsNodeStr.substr(1).split(NULL)[0]);
-        break;
-      default:
-        throw new Error('Unhandled case of stringified node: ' + domjsNodeStr.charAt(0));
+    substArr = domjsNodeStr.split(NUL);
+    for (i=0; i<substArr.length; i++) {
+      t = substArr[i].charAt(0);
+      s = substArr[i].slice(1);
+      if (t === '') break;
+      switch (t) {
+        case 'T':
+          n = hostDoc.createTextNode(s)
+          break;
+        case 'C':
+          n = hostDoc.createComment(s);
+          break;
+        case 'H':
+        case 'E':
+          n = hostDoc.createElement(s);
+          if (parentNode) parentNode.appendChild(n);
+          parentNode = n;
+          break;
+        default:
+          throw new Error('Unhandled case of stringified node: ' + t);
+      }
+      if (!nodeMap[nid]) nodeMap[nid] = n;
     }
-    nodeMap[nid] = n;
+
     return n;
   }
 
@@ -120,6 +131,17 @@
     var parentNode = nodeMap[parentId],
         beforeNode = parentNode.childNodes[position];
     parentNode.insertBefore(hostNode, beforeNode);
+  }
+
+  function parseFacetedValue(s) {
+    alert(s);
+    if (!s) return s;
+    // FIXME: Need some more robust checking
+    if (s.charAt(0) !== '(') return s;
+
+    // JSON.parse does not seem to work here.  Very sad.
+    var fv = eval(s);
+    return fv.authorized;
   }
 
   exports.copyDOMintoDomjs = function() {
@@ -148,18 +170,20 @@
 
     // Callback handler registers mutation events to reflect changes in the host DOM.
     document.implementation.mozSetOutputMutationHandler(document, function(o){
-      var hostNode, parentNode;
+      var hostNode, parentNode, newVal;
+      //alert('mutating stuff');
       switch(o.type) {
         case MUTATE_VALUE:
           nodeMap[o.target].data = o.data;
           break;
         case MUTATE_ATTR:
+          newVal = parseFacetedValue(o.value);
           if (o.ns === null && o.prefix === null) {
-            nodeMap[o.target].setAttribute(o.name, o.value);
+            nodeMap[o.target].setAttribute(o.name, newVal);
           }
           else {
             // TODO: need to test this version
-            nodeMap[o.target].setAttributeNS(o.ns, o.name, o.value);
+            nodeMap[o.target].setAttributeNS(o.ns, o.name, newVal);
           }
           break;
         case MUTATE_REMOVE_ATTR:
@@ -175,6 +199,11 @@
           break;
         case MUTATE_INSERT:
           hostNode = createHostNode(o.child, o.nid);
+          var s = '';
+          for (var i in o) {
+            s += i + ':' + o[i] + ' ';
+          }
+          //alert('Inserted element ' + s);
           insertAtPosition(o.parent, hostNode, o.index);
           break;
         default:

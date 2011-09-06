@@ -107,13 +107,25 @@
 
   // Call Narcissus interpreter
   function evaluate(code, source, lineNum) {
+    if (!Narcissus.interpreter)
+      throw new Error('Interpreter not loaded when trying to evaluate ' + code);
     Narcissus.interpreter.evaluate(code, source, lineNum);
+  }
+
+  function principalName(url) {
+    if (url.indexOf('http') !== 0) return null;
+    var p = url.slice(0, url.lastIndexOf('/'));
+    //return p;
+    return null;
   }
 
   // Load and execute the specified JS url
   function loadExternalScript(url) {
     Zaphod.log('Running script from ' + url);
-    Narcissus.interpreter.evaluate(snarf(url), url, 1);
+    var p = principalName(url);
+    var code = snarf(url);
+    if (p) code = '(cloak(' + code + ',' + p + '))';
+    Narcissus.interpreter.evaluate(code, url, 1);
   }
 
    // Run a JS command through Narcissus
@@ -321,7 +333,7 @@
       //FIXME: Clear out utils and hostDoc from narcissus object
 
       Narcissus.interpreter.getValueHook = function(name) {
-        evaluate('var ' + name + 'document.getElementById(' + name + ');');
+        evaluate('var ' + name + ' = document.getElementById(' + name + ');');
       }
     }
     else {
@@ -346,7 +358,7 @@
 
   // Loads the Narcissus scripts
   function loadNarcissus() {
-    if (this.Narcissus) return;
+    //if (this.Narcissus && this.Narcissus.interpreter) return;
 
     Zaphod.log('Loading narcissus');
 
@@ -359,6 +371,7 @@
     Narcissus.options.hiddenHostGlobals.content = true;
     Narcissus.options.hiddenHostGlobals.setInterval = true;
     Narcissus.options.hiddenHostGlobals.setTimeout = true;
+    eval(read(baseURL + 'facetedValues.js'));
     eval(read(baseURL + 'narcissus/jsexec.js'));
     eval(read(baseURL + 'browserAPIs.js'));
 
