@@ -11,8 +11,8 @@ Zaphod.facets = {};
         this.unauthorized = unauth;
     }
     FacetedValue.prototype.toString = function() {
-        return '<' + this.label + '?' + this.authorized + ':' + this.unauthorized + '>';
-        //return uneval(this);
+        //return '<' + this.label + '?' + this.authorized + ':' + this.unauthorized + '>';
+        return uneval(this);
     }
     exports.FacetedValue = FacetedValue;
 
@@ -92,6 +92,7 @@ Zaphod.facets = {};
     Label.prototype.toString = function() {
         return this.value;
     }
+    exports.Label = Label;
 
     // FIXME: this is such a hack
     const MAX_LABEL= 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
@@ -119,6 +120,10 @@ Zaphod.facets = {};
             if (l.value === label.value) return true;
         }
         return false;
+    }
+    // Only works for lower case strings
+    ProgramCounter.prototype.containsStr = function(labelStr) {
+        return this.contains(new Label(labelStr));
     }
     ProgramCounter.prototype.join = function(label) {
         if (this.contains(label)) return this;
@@ -314,7 +319,8 @@ Zaphod.facets = {};
         if (!v) return v;
         if (v instanceof FacetedValue) return v;
         if (v.authorized === undefined) return v;
-        return new FacetedValue(v.label,
+        let label = new Label(v.label.value);
+        return new FacetedValue(label,
                 rebuild(v.authorized),
                 rebuild(v.unauthorized));
     }

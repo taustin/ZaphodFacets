@@ -41,7 +41,3 @@ Zaphod.clearAllTimers = function() {
   });
 }
 
-// Hack to avoid problems with the Image constructor in Narcissus.
-Narcissus.interpreter.global.Image = function() {};
-
-

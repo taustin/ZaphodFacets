@@ -360,6 +360,11 @@ const [unwrap, unwrapOrNull, wrap] = (function() {
         // If I ever remove or alter mappings, then this won't be valid anymore.
         if (n === lastkey) return lastvalue;
 
+        if (n instanceof Zaphod.facets.FacetedValue) {
+            alert('fv');
+            n = n.authorized;
+        }
+
         try {
             var impl = wmget(idlToImplMap, n);
 

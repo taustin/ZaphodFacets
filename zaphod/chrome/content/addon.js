@@ -47,7 +47,10 @@
     Zaphod.statusImage.src = "chrome://zaphod/content/mozilla_activated.ico";
     Zaphod.statusImage.tooltipText = "JS engine = Narcissus";
     Zaphod.mozJSPref.setBoolPref("enabled", false);
-    if (verbose) { alert("Narcissus has been set as your JavaScript engine"); }
+    if (verbose) {
+      alert("Narcissus has been set as your JavaScript engine.  "
+        + "Reload to rerun the JavaScript on the current page.");
+    }
   }
 
   // Set Spidermonkey to be used as the JS engine
@@ -326,6 +329,10 @@
       // Utilities needed for dom.js
       var utils = read('chrome://zaphod/content/utils.js');
       evaluate(utils, 'utils.js', 1);
+
+      // Policy for tainting DOM elements.
+      var policy = read('chrome://zaphod/content/policy.js');
+      evaluate(policy, 'policy.js', 1);
 
       // Copy the host DOM
       Narcissus.interpreter.global['hostDoc'] = content.document;

@@ -65,6 +65,7 @@ Narcissus.interpreter = (function() {
     // Faceted Value utilities
     var FacetedValue = Zaphod.facets.FacetedValue;
     var ProgramCounter = Zaphod.facets.ProgramCounter;
+    var Label = Zaphod.facets.Label;
     var buildVal = Zaphod.facets.buildVal;
     var evaluateEach = Zaphod.facets.evaluateEach;
     var evaluateEachPair = Zaphod.facets.evaluateEachPair;
@@ -143,15 +144,19 @@ Narcissus.interpreter = (function() {
             return x2.result;
         },
 
-        /*
+        // Displays only high alerts (assumes a simple hi/lo lattice
         alert: function(msg){
-            alert('pc(' + getPC() + '):' + msg);
+            let pc = getPC();
+            if (pc.containsStr('h') || pc.isEmpty())
+                alert(msg);
+            else
+                Zaphod.log('Suppressed unauthorized alert pc:' + pc + ' msg: "' + msg + '"');
         },
 
-        print: function(msg){
-            print('pc(' + getPC() + '):' + msg);
+        exportValue: function(fv) {
+            let v = (fv instanceof FacetedValue) ? fv.unauthorized : fv;
+            alert('Attacker sees "' + v + '"');
         },
-        */
 
         // Class constructors.  Where ECMA-262 requires C.length === 1, we declare
         // a dummy formal parameter.
@@ -182,17 +187,25 @@ Narcissus.interpreter = (function() {
             return Array.apply(this, arguments);
         },
         String: function String(s) {
-            // Called as function or constructor: convert argument to string type.
-            s = arguments.length ? "" + s : "";
+            var argSpecified = arguments.length;
+            var newStr = evaluateEach(s, function(s,x) {
+                // Called as function or constructor: convert argument to string type.
+                return (argSpecified ? "" + s : "");
+            }, ExecutionContext.current);
+
             if (this instanceof String) {
                 // Called as constructor: save the argument as the string value
                 // of this String object and return this object.
-                this.value = s;
-                definitions.defineProperty(this, 'length', s.length, true,
+                this.value = newStr;
+                var strlen = evaluateEach(newStr, function(s,x) {
+                    // Called as function or constructor: convert argument to string type.
+                    return s ? s.length : 0;
+                }, ExecutionContext.current);
+                definitions.defineProperty(this, 'length', strlen, true,
                         true, true);
                 return this;
             }
-            return s;
+            else return newStr;
         },
 
         // Don't want to proxy RegExp or some features won't work
@@ -210,12 +223,26 @@ Narcissus.interpreter = (function() {
         assertEq: function() {
             return assertEq.apply(null, arguments);
         },
-        cloak: Zaphod.facets.cloak,
+        cloak: function(v) {
+            // In Zaphod, sticking with a 2-element lattice
+            return Zaphod.facets.cloak(v,'h');
+        },
+        isFacetedValue: function(v) {
+            return (v instanceof FacetedValue);
+        },
         // A view is represented as a program counter,
         // except that all labels can only be 'positive'.
         // If a label is not explicitly in the view,
         // the viewer sees the unauthorized view.
         getView: Zaphod.facets.getView,
+        getAuth: function(v) {
+            return Zaphod.facets.getView(v,
+                    new ProgramCounter(new Label('h')));
+        },
+        getUnAuth: function(v) {
+            return Zaphod.facets.getView(v,
+                    new ProgramCounter((new Label('h')).reverse()));
+        },
     };
 
     // Load missing functions onto Array and String
@@ -1168,6 +1195,9 @@ Narcissus.interpreter = (function() {
             throw "PANIC: unknown operation " + n.type + ": " + uneval(n);
         }
 
+        // For some odd reasons, faceted values sometimes forget their class.
+        // We rebuild them here if needed.
+        //v = rebuild(v);
         return v;
         /*
         } catch(e if !isSignal(e)) {
@@ -1429,10 +1459,7 @@ Narcissus.interpreter = (function() {
                                        var thisObj = this;
                                        switch (a.length) {
                                          case 1:
-                                            //Zaphod.log('a[0]=' + a[0] + ' pc:' + getPC());
-                                            //if (a[0]) Zaphod.log('?' + (a[0] instanceof FacetedValue) + 'auth' + a[0].authorized);
                                             return evaluateEach(rebuild(a[0],x.pc), function(v,x) {
-                                               //Zaphod.log('**v=' + v);
                                                return thisObj.call(t, v);
                                             }, x);
                                          case 2:

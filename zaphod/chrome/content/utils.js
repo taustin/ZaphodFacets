@@ -15,6 +15,7 @@
   const MUTATE_INSERT = 6;
   const NUL = '\0';
 
+  // Maps nid to host nodes
   var nodeMap={};
 
   const actions = [ 'abort', 'blur', 'change', 'click', 'dblclick', 'error',
@@ -45,11 +46,31 @@
 
   // Some cheats to deal with magic properties.  Not exhaustive
   function addMagicProperties(n, hostNode) {
+    // Note -- this sidesteps the dom.js hooks, which complicates the analysis
     ['style', 'value', 'innerHTML', 'src', 'offsetLeft', 'offsetTop'].forEach(function(prop) {
-      Object.defineProperty(n, prop, {
-          get: function() { return hostNode[prop]; },
-          set: function(newVal) { hostNode[prop] = newVal; }
-      });
+      (function() {
+        var val;
+        Object.defineProperty(n, prop, {
+          get: function() {
+            if (isFacetedValue(val)) {
+              return val;
+            }
+            val = hostNode[prop];
+            return val;
+            //return hostNode[prop];
+          },
+          set: function(newVal) {
+            val = newVal;
+            if (!isFacetedValue(newVal)) {
+              // For ease of implementation, we ignore faceted writes.
+              // Note that this differs from what happens in dom.js
+              hostNode[prop] = newVal;
+            }
+          }
+        });
+        // Invalidate the value when the user enters a change.
+        hostNode.addEventListener('change', function() { val=undefined; });
+      })();
     });
   }
 
@@ -133,20 +154,23 @@
     parentNode.insertBefore(hostNode, beforeNode);
   }
 
-  function parseFacetedValue(s) {
-    alert(s);
-    if (!s) return s;
-    // FIXME: Need some more robust checking
-    if (s.charAt(0) !== '(') return s;
-
-    // JSON.parse does not seem to work here.  Very sad.
-    var fv = eval(s);
-    return fv.authorized;
+  // The auth function should take a faceted value and returns true
+  // if the high view is authorized, and false otherwise.
+  // If auth is undefined, the authorized view will be rendered to the host DOM.
+  function parseFacetedValue(fv, auth) {
+    if (!fv) return fv;
+    if (!auth || auth(fv))
+      return getAuth(fv);
+    else
+      return getUnAuth(fv);
   }
 
+  // Hard-coded nids
+  const DOCUMENT_NID = 1,
+        BODY_NID = 7;
   exports.copyDOMintoDomjs = function() {
-    // Setting pre-defined nodes (currently incomplete)
-    nodeMap.document = 1;
+    // FIXME: need a better way to map the document
+    nodeMap[DOCUMENT_NID] = hostDoc;
 
     var head = document.getElementsByTagName('head')[0];
     var hostHead = hostDoc.getElementsByTagName('head')[0];
@@ -160,6 +184,8 @@
     var hostBody = hostDoc.getElementsByTagName('body')[0];
     body.style = hostBody.style;
     cloneNode(hostBody, document, body);
+    // FIXME: need a better way to map the body
+    nodeMap[BODY_NID] = body;
 
     // Cheat: creating getter/setter pair for scrollTop
     Object.defineProperty(body, 'scrollTop', {
@@ -170,14 +196,27 @@
 
     // Callback handler registers mutation events to reflect changes in the host DOM.
     document.implementation.mozSetOutputMutationHandler(document, function(o){
-      var hostNode, parentNode, newVal;
-      //alert('mutating stuff');
+      var hostNode, parentNode, newVal, auth;
+      var s = '';
+      for (var i in o) {
+        s += i + ':' + o[i] + ' ';
+      }
+      //alert('mutations... ' + s);
       switch(o.type) {
         case MUTATE_VALUE:
           nodeMap[o.target].data = o.data;
           break;
         case MUTATE_ATTR:
-          newVal = parseFacetedValue(o.value);
+          // Src attributes might load data from external sites.
+          // Use the public view if that happens.
+          // (Note: this policy is for a demo, and is not intended
+          // to be anything approaching comprehensive at this point).
+          auth = function(fv) {
+            if (o.name !== 'src') return true;
+            var authorized = getAuth(fv);
+            return authorized.indexOf('http') !== 0;
+          }
+          newVal = parseFacetedValue(o.value, auth);
           if (o.ns === null && o.prefix === null) {
             nodeMap[o.target].setAttribute(o.name, newVal);
           }
@@ -199,11 +238,6 @@
           break;
         case MUTATE_INSERT:
           hostNode = createHostNode(o.child, o.nid);
-          var s = '';
-          for (var i in o) {
-            s += i + ':' + o[i] + ' ';
-          }
-          //alert('Inserted element ' + s);
           insertAtPosition(o.parent, hostNode, o.index);
           break;
         default:
