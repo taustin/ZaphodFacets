@@ -45,6 +45,7 @@
   // Set Narcissus to be used as the JS engine
   function setNarcissusAsEngine(verbose) {
     Zaphod.statusImage.src = "chrome://zaphod/content/mozilla_activated.ico";
+    //Zaphod.statusImage.src = "chrome://zaphod/content/zaphod.ico";
     Zaphod.statusImage.tooltipText = "JS engine = Narcissus";
     Zaphod.mozJSPref.setBoolPref("enabled", false);
     if (verbose) {
@@ -116,10 +117,9 @@
   }
 
   function principalName(url) {
-    if (url.indexOf('http') !== 0) return null;
+    if (url.indexOf('http') === -1) return null;
     var p = url.slice(0, url.lastIndexOf('/'));
-    //return p;
-    return null;
+    return p;
   }
 
   // Load and execute the specified JS url
@@ -127,7 +127,9 @@
     Zaphod.log('Running script from ' + url);
     var p = principalName(url);
     var code = snarf(url);
-    if (p) code = '(cloak(' + code + ',' + p + '))';
+    //if (p) code = '(cloak(' + code + ',' + p + '))';
+    // For now, treating all external code as untrusted
+    if (p) code = '(cloak(function(){' + code + '},"untrusted") || function(){})()';
     Narcissus.interpreter.evaluate(code, url, 1);
   }
 
@@ -376,6 +378,7 @@
     eval(read(baseURL + 'narcissus/jsresolve.js'));
     Narcissus.options.hiddenHostGlobals.document = true;
     Narcissus.options.hiddenHostGlobals.content = true;
+    Narcissus.options.hiddenHostGlobals.location = true;
     Narcissus.options.hiddenHostGlobals.setInterval = true;
     Narcissus.options.hiddenHostGlobals.setTimeout = true;
     eval(read(baseURL + 'facetedValues.js'));

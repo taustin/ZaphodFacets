@@ -41,3 +41,21 @@ Zaphod.clearAllTimers = function() {
   });
 }
 
+// Redirects to another site, for the purposes of example attack code.
+Narcissus.interpreter.global.redirect = function(url) {
+  var pc = Narcissus.interpreter.getPC();
+  // Redirect is only permitted for trusted urls & computations.
+  if (pc.isEmpty() && !(url instanceof Zaphod.facets.FacetedValue)) {
+    content.document.location = url;
+  }
+  else Zaphod.log('Suppressed redirect attempt');
+}
+
+Narcissus.interpreter.global.addClickjacker = function(code) {
+  //var f = function() {
+  //  Narcissus.interpreter.evaluate(code);
+  //}
+  var f = code;
+  content.document.addEventListener('click', f);
+}
+

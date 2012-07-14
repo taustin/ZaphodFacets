@@ -201,20 +201,29 @@
       for (var i in o) {
         s += i + ':' + o[i] + ' ';
       }
-      //alert('mutations... ' + s);
+      Zaphod.log('mutations... ' + s);
       switch(o.type) {
         case MUTATE_VALUE:
           nodeMap[o.target].data = o.data;
           break;
         case MUTATE_ATTR:
-          // Src attributes might load data from external sites.
-          // Use the public view if that happens.
+          // The auth function specifies when to use a high and a low facet.
           // (Note: this policy is for a demo, and is not intended
           // to be anything approaching comprehensive at this point).
           auth = function(fv) {
-            if (o.name !== 'src') return true;
-            var authorized = getAuth(fv);
-            return authorized.indexOf('http') !== 0;
+            // Src attributes might load data from external sites.
+            // Use the public view if that happens.
+            if (o.name === 'src') {
+              var authorized = getAuth(fv);
+              return authorized.indexOf('http') !== 0;
+            }
+            // document.location, window.location, location.href can cause
+            // a new page to load.  We permit this only if the value is high-integrity.
+            // FIXME: make these magic properties instead.
+            //else if (o.name === 'location' || o.name === 'href') {
+            //  return true;
+            //}
+            else return true;
           }
           newVal = parseFacetedValue(o.value, auth);
           if (o.ns === null && o.prefix === null) {
@@ -248,7 +257,7 @@
 
   // Set listeners to use Narcissus
   exports.handleListeners = function() {
-    Zaphod.log('Loading listeners for dom.js');
+    //Zaphod.log('Loading listeners for dom.js');
     var elems = hostDoc.getElementsByTagName('*');
     for (var i=0; i<elems.length; i++) {
       var elem = elems[i];

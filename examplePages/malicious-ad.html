@@ -1,0 +1,64 @@
+<html>
+<head>
+  <title>Advertising example</title>
+  <script>
+    //alert('Ha, ha!  I hack you');
+    //document.location = 'http://www.bias2build.com';
+  </script>
+</head>
+<body>
+  <h1>Advertising example</h1>
+  <p>
+  Money makes the world go round, and advertising powers the web.
+  There are lots of varieties of advertising used,
+  but JavaScript-powered ads have become the norm.
+  </p>
+  <p>
+  Google's AdSense is one example.
+  Google is a trusted, respected name.
+  Instinctively, people will not be suspicious of a link like the following:
+  </p>
+
+<div>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<!-- Add (fake) Google +1 button to render -->
+<span id='plusone'></span>
+&nbsp;&nbsp;
+<span>Like my story!!!</span>
+</div>
+
+  <p>
+  But the advertising code is not really coming from Google.
+  In fact, this comes from a third-party site,
+  but with a little obfuscation/minimization might very well
+  <a id='nytimes-link' href='http://www.nytimes.com/2009/09/15/technology/internet/15adco.html'
+     > pass by reviewers undetected</a>.
+  </p>
+
+  <p>
+  But this advertiser is not so trustworthy now.
+  If you click on this page,
+  an attempt was made to redirect you to a 'malicious' site.
+  Try running this page with SpiderMonkey enabled,
+  and then rerun with the Zaphod engine enabled.
+  </p>
+
+  <p>
+  With <a href='https://github.com/taustin/ZaphodFacets'>Zaphod w/ Faceted Values</a>,
+  we run all code using the dom.js DOM,
+  but we can monitor mutation events before they hit the underlying host DOM.
+  </p>
+
+<!-- Load advertiser code -->
+<script type="application/javascript" src='ad.js'>
+</script>
+<!-- malicous code -->
+<script type="application/javascript" src='http://localhost/infoflow/clickjack.js'>
+</script>
+
+  <p>
+  <strong>Be sure that the modified version of Zaphod is installed and active.</strong>
+  You should see a small, red mozilla logo at the bottom right of your browser.
+  </p>
+</body>
+</html>
