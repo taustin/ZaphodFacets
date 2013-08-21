@@ -1,5 +1,5 @@
 // Trusted code created by the website.
-document.getElementsByTagName('form')[0].addEventListener('submit', function(e) {
+document.getElementById('slugform').addEventListener('submit', function(e) {
     e.preventDefault(); e.stopPropagation();
     var p = document.getElementById('pass');
     var pwd = p.value || 'default';
