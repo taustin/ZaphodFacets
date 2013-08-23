@@ -1,6 +1,6 @@
 // Trusted code created by the website.
-var b = document.getElementById('passBut');
-b.addEventListener('click', function() {
+document.getElementById('slugform').addEventListener('submit', function(e) {
+    e.preventDefault(); e.stopPropagation();
     var p = document.getElementById('pass');
     var pwd = p.value || 'default';
     var hash = hex_md5(pwd);
