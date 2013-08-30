@@ -3,15 +3,6 @@
 // were taken to ensure that the policy code ran before any potential attack code.
 // Of course, malicious chrome code might invalidate any of these policies.
 // Piece at a time...
-var oldGetById = document.getElementById;
-document.getElementById = function() {
-  var elem = oldGetById.apply(document, arguments);
-  if (elem instanceof Element && elem.getAttribute('type')==='password') {
-    elem.value = cloak(elem.value);
-  }
-  return elem;
-}
-
 Zaphod = this.Zaphod || {};
 var policyFns = [];
 Zaphod.policy = {
