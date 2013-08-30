@@ -3,20 +3,6 @@
 // were taken to ensure that the policy code ran before any potential attack code.
 // Of course, malicious chrome code might invalidate any of these policies.
 // Piece at a time...
-(function() {
-
-// Passwords should be protected
- /*
-var oldGetAttr = Element.prototype.getAttribute;
-Element.prototype.getAttribute = function(attrName) {
-  var attr = oldGetAttr.apply(this, arguments);
-  if (oldGetAttr.call(this, 'type') === 'password') {
-    return cloak(attr);
-  }
-  return attr;
-}
-*/
-
 var oldGetById = document.getElementById;
 document.getElementById = function() {
   var elem = oldGetById.apply(document, arguments);
@@ -26,4 +12,24 @@ document.getElementById = function() {
   return elem;
 }
 
-})();
+Zaphod = this.Zaphod || {};
+var policyFns = [];
+Zaphod.policy = {
+  checkElement: function(element) {
+    policyFns.forEach(function(policyFn) {
+      policyFn(element);
+    });
+  },
+  //Only call this with NodeList. That's all it's being called with right now, so I'm not going to
+  //bother covering Arrays just yet.
+  checkElements: function(elements) {
+    if (elements instanceof NodeList) {
+      for (var i = 0; i < elements.length; i++) {
+	Zaphod.policy.checkElement(elements.item(i));
+      }
+    }
+  },
+  addPolicyFn: function(policyFn) {
+    policyFns.push(policyFn);
+  }
+};
