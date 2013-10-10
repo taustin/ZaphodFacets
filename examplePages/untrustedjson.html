@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head><title>Untrusted JSON</title></head>
+  <body>
+    <script type="application/javascript" src="http://localhost/infoflow/untrustedjson.js"></script>
+    <h1>Untrusted JSON</h1>
+    <h2>Description</h2>
+    <p>
+      Say you have a string of valid JSON coming from an untrusted source.
+      You'd like to be able to get a sanctified Object back without having to
+      carry around a faceted value. All of that is fine since, assuming a
+      decent JSON parser, nothing too shady can happen.
+    </p>
+    <p>
+      We'll simulate getting an untrusted value, then hand it off to JSON.parse,
+      and then finally get back our holy object. We'll then display a specific
+      property from the parsed object.
+    </p>
+    <h2>Demo area</h2>
+    <p>Untrusted JSON's hello property: <span id="hellovalue"></span></p>
+    <script type="application/javascript">
+      var trustedObject = JSON.parse(untrustedJSON);
+      document.getElementById('hellovalue').innerHTML = trustedObject.hello;
+    </script>
+  </body>
+</html>
