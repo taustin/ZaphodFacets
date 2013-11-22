@@ -67,3 +67,6 @@ Narcissus.interpreter.global.JSON.parse = function (json) {
   }
   return originalJSONParse.call(originalJSON, json);
 };
+Narcissus.interpreter.global.addPolicyFn = function(fn) {
+  Zaphod.policy.addPolicyFn(fn);
+}

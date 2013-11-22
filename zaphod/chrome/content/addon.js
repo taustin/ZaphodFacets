@@ -336,6 +336,9 @@
       var policy = read('chrome://zaphod/content/policy.js');
       evaluate(policy, 'policy.js', 1);
 
+      var wrapper = read('chrome://zaphod/content/wrapper.js');
+      evaluate(wrapper, 'wrapper.js', 1);
+
       // Copy the host DOM
       Narcissus.interpreter.global['hostDoc'] = content.document;
       evaluate('copyDOMintoDomjs()');
