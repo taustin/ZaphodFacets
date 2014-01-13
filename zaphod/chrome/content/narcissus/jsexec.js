@@ -309,7 +309,7 @@ Narcissus.interpreter = (function() {
 
     function evalBinOp(v1, v2, x, op) {
         return evaluateEachPair(v1, v2, function(v1, v2) {
-            return eval('v1' + op + 'v2');
+            return eval('v1 ' + op + ' v2');
         }, x);
     }
 
