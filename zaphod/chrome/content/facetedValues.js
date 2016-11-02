@@ -276,7 +276,7 @@ Zaphod.facets = {};
         let lab = new Label(principal);
         if (pc.contains(lab))
             return v;
-        else if (pc.contains(lab.reverse))
+        else if (pc.contains(lab.reverse()))
             return undefined;
         else
             return new FacetedValue(new Label(principal), v, undefined);
